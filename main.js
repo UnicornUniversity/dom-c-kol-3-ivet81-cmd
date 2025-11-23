@@ -1,50 +1,85 @@
 /**
  * Generates a list of employees based on input parameters.
  *
- * @param {Object} dtoIn - Input data.
- * @param {number} dtoIn.employeeCount - Number of employees to generate.
- * @param {Object} dtoIn.ageRange - Age range of employees.
- * @param {number} dtoIn.ageRange.min - Minimum age.
- * @param {number} dtoIn.ageRange.max - Maximum age.
- * @returns {Object} dtoOut - Output data.
- * @returns {Array} dtoOut.employees - List of generated employees.
+ * @param {object|number} [dtoIn] - Input data or directly employee count.
+ *  - If number: treated as employeeCount.
+ *  - If object: can contain employeeCount and ageRange.
+ * @returns {Array<object>} List of generated employees.
  */
 function main(dtoIn) {
-  // --- Input validation ---
-  if (!dtoIn || typeof dtoIn !== "object") {
-    throw new Error("dtoIn must be an object.");
+  // --- Normalize input & determine employeeCount ---
+
+  const safeDtoIn = dtoIn ?? null;
+  let employeeCount = 0;
+
+  // If dtoIn is a number, treat it directly as employeeCount
+  if (typeof safeDtoIn === "number") {
+    if (Number.isInteger(safeDtoIn) && safeDtoIn >= 0) {
+      employeeCount = safeDtoIn;
+    }
+  } else if (typeof safeDtoIn === "object" && safeDtoIn !== null) {
+    const candidate =
+      safeDtoIn.employeeCount ?? safeDtoIn.personCount ?? safeDtoIn.count;
+    if (Number.isInteger(candidate) && candidate >= 0) {
+      employeeCount = candidate;
+    }
   }
 
-  const employeeCount = dtoIn.employeeCount;
-  const minAge = dtoIn?.ageRange?.min;
-  const maxAge = dtoIn?.ageRange?.max;
+  // --- Age range handling ---
+
+  let minAge = 18;
+  let maxAge = 65;
 
   if (
-    typeof employeeCount !== "number" ||
-    !Number.isInteger(employeeCount) ||
-    employeeCount <= 0
+    typeof safeDtoIn === "object" &&
+    safeDtoIn !== null &&
+    safeDtoIn.ageRange
   ) {
-    throw new Error("employeeCount must be a positive integer.");
+    const { min, max } = safeDtoIn.ageRange;
+
+    if (Number.isInteger(min) && min >= 0) {
+      minAge = min;
+    }
+    if (Number.isInteger(max) && max >= minAge) {
+      maxAge = max;
+    }
+    if (maxAge < minAge) {
+      maxAge = minAge;
+    }
   }
 
-  if (
-    typeof minAge !== "number" ||
-    typeof maxAge !== "number" ||
-    !Number.isInteger(minAge) ||
-    !Number.isInteger(maxAge) ||
-    minAge < 0 ||
-    maxAge < 0 ||
-    minAge > maxAge
-  ) {
-    throw new Error(
-      "ageRange.min and ageRange.max must be valid integers and min <= max."
-    );
-  }
+  // --- Data sources for random generation ---
 
-  // --- Data sources ---
-  const maleNames = ["Peter", "John", "Martin", "Thomas", "Michael", "James", "Robert", "William"];
-  const femaleNames = ["Emma", "Olivia", "Sophia", "Ava", "Isabella", "Mia", "Emily", "Amelia"];
-  const surnames = ["Smith", "Johnson", "Brown", "Taylor", "Anderson", "Thomas", "Jackson", "White"];
+  const maleNames = [
+    "Peter",
+    "John",
+    "Martin",
+    "Thomas",
+    "Michael",
+    "James",
+    "Robert",
+    "William"
+  ];
+  const femaleNames = [
+    "Emma",
+    "Olivia",
+    "Sophia",
+    "Ava",
+    "Isabella",
+    "Mia",
+    "Emily",
+    "Amelia"
+  ];
+  const surnames = [
+    "Smith",
+    "Johnson",
+    "Brown",
+    "Taylor",
+    "Anderson",
+    "Thomas",
+    "Jackson",
+    "White"
+  ];
   const workloads = [10, 20, 30, 40];
   const genders = ["male", "female"];
 
@@ -56,57 +91,60 @@ function main(dtoIn) {
     return array[randomInt(0, array.length - 1)];
   }
 
-  function randomBirthdate(minAgeYears, maxAgeYears) {
-    const today = new Date();
+  /**
+   * Generates a random date in format "YYYY-MM-DD" (exactly 10 chars),
+   * where age is between minAgeYears and maxAgeYears (inclusive).
+   *
+   * @param {number} minAgeYears
+   * @param {number} maxAgeYears
+   * @returns {string} "YYYY-MM-DD"
+   */
+  function randomBirthdate10(minAgeYears, maxAgeYears) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
 
-    const maxDate = new Date(
-      today.getFullYear() - minAgeYears,
-      today.getMonth(),
-      today.getDate()
-    );
+  const minYear = currentYear - maxAgeYears; // najstarší
+  const maxYear = currentYear - minAgeYears; // najmladší
 
-    const minDate = new Date(
-      today.getFullYear() - maxAgeYears,
-      today.getMonth(),
-      today.getDate()
-    );
+  const year = randomInt(minYear, maxYear);
+  const month = randomInt(1, 12);
 
-    const randomTime = randomInt(minDate.getTime(), maxDate.getTime());
-    const date = new Date(randomTime);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const day = randomInt(1, daysInMonth);
 
-    return date.toISOString().slice(0, 10);
-  }
+  const m = String(month).padStart(2, "0"); // 01–12
+  const d = String(day).padStart(2, "0");   // 01–31
+
+  // presne 10 znakov
+  return `${year}-${m}-${d}`;
+}
+
 
   // --- Generate employees ---
+
   const employees = [];
 
   for (let i = 0; i < employeeCount; i++) {
     const gender = randomElement(genders);
     const name =
-      gender === "male"
-        ? randomElement(maleNames)
-        : randomElement(femaleNames);
+      gender === "male" ? randomElement(maleNames) : randomElement(femaleNames);
 
     const surname = randomElement(surnames);
-    const birthdate = randomBirthdate(minAge, maxAge);
+    const birthdate = randomBirthdate10(minAge, maxAge); // UŽ JE TO 10-CHAR STRING
+
     const workload = randomElement(workloads);
 
-    const employee = {
+    employees.push({
       name,
       surname,
       gender,
       birthdate,
       workload
-    };
-
-    employees.push(employee);
+    });
   }
 
-  const dtoOut = { employees };
-  return dtoOut;
+  return employees;
 }
 
-
-
-// ✅ ES MODULE EXPORT
 export default main;
+export { main };
